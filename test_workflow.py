@@ -136,8 +136,8 @@ def main():
     print("\n" + "="*60)
     print("测试总结")
     print("="*60)
-    print(f"免费 API 测试: {'✓ 成功' if success1 else '✗ 失败'}")
-    print(f"OpenAI 兼容 API 测试: {'✓ 成功' if success2 else '✗ 跳过/失败'}")
+    print(f"免费 API 测试: {'[成功]' if success1 else '[失败]'}")
+    print(f"OpenAI 兼容 API 测试: {'[成功]' if success2 else '[跳过/失败]'}")
     
     if success1 or success2:
         print("\n[成功] 至少一个测试通过!")

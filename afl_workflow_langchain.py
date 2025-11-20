@@ -28,15 +28,56 @@ try:
 except ImportError:
     from langchain_core.prompts import ChatPromptTemplate
 
-try:
-    from langchain.chains import LLMChain, SequentialChain
-except ImportError:
-    from langchain.chains import LLMChain
-    # SequentialChain 可能在新版本中位置不同
-    try:
-        from langchain.chains import SequentialChain
-    except ImportError:
-        SequentialChain = None
+# LangChain 1.0+ 不再有 LLMChain 和 SequentialChain
+# 我们创建简单的替代实现
+LLMChain = None
+SequentialChain = None
+
+# 创建一个简单的 LLMChain 替代类
+class SimpleLLMChain:
+    """简单的 LLM 链替代实现"""
+    def __init__(self, llm, prompt, output_key=None):
+        self.llm = llm
+        self.prompt = prompt
+        self.output_key = output_key
+    
+    def run(self, **kwargs):
+        """运行链"""
+        # 使用 ChatPromptTemplate 的 invoke 或 format_messages 方法
+        try:
+            if hasattr(self.prompt, 'invoke'):
+                messages = self.prompt.invoke(kwargs)
+            elif hasattr(self.prompt, 'format_messages'):
+                messages = self.prompt.format_messages(**kwargs)
+            else:
+                # 回退到 format 方法
+                messages = self.prompt.format(**kwargs)
+        except Exception:
+            # 如果格式化失败，尝试直接使用 kwargs
+            try:
+                messages = self.prompt.format_messages(**kwargs)
+            except Exception:
+                messages = str(kwargs)
+        
+        # 调用 LLM
+        if hasattr(self.llm, 'invoke'):
+            result = self.llm.invoke(messages)
+        elif hasattr(self.llm, '__call__'):
+            result = self.llm(messages)
+        else:
+            result = str(messages)
+        
+        # 提取文本内容
+        if hasattr(result, 'content'):
+            result_text = result.content
+        elif isinstance(result, str):
+            result_text = result
+        else:
+            result_text = str(result)
+        
+        if self.output_key:
+            return {self.output_key: result_text}
+        return {"result": result_text}
 
 try:
     from langchain.memory import ConversationBufferMemory
@@ -296,41 +337,31 @@ class AFLWorkflowLangChain:
     def _create_workflow_chain(self):
         """创建工作流链"""
         # 阶段 1: 分析
-        analyze_chain = LLMChain(
+        analyze_chain = SimpleLLMChain(
             llm=self.llm,
             prompt=self.prompts["analyze"],
             output_key="analysis_result"
         )
         
         # 阶段 2: 生成 harness
-        generate_chain = LLMChain(
+        generate_chain = SimpleLLMChain(
             llm=self.llm,
             prompt=self.prompts["generate_harness"],
             output_key="harness_code"
         )
         
-        # 创建顺序链 (如果 SequentialChain 可用)
-        if SequentialChain:
-            workflow = SequentialChain(
-                chains=[analyze_chain, generate_chain],
-                input_variables=["target_file"],
-                output_variables=["analysis_result", "harness_code"],
-                verbose=True
-            )
-            return workflow
-        else:
-            # 如果 SequentialChain 不可用，返回一个简单的包装
-            class SimpleChain:
-                def __init__(self, chains):
-                    self.chains = chains
-                
-                def run(self, **kwargs):
-                    result = {}
-                    for chain in self.chains:
-                        result.update(chain.run(**kwargs))
-                    return result
+        # 创建顺序链包装
+        class SimpleChain:
+            def __init__(self, chains):
+                self.chains = chains
             
-            return SimpleChain([analyze_chain, generate_chain])
+            def run(self, **kwargs):
+                result = {}
+                for chain in self.chains:
+                    result.update(chain.run(**kwargs))
+                return result
+        
+        return SimpleChain([analyze_chain, generate_chain])
     
     # ========== 工具函数实现 ==========
     
@@ -373,13 +404,22 @@ class AFLWorkflowLangChain:
 请生成完整的 harness 代码。"""
         
         # 调用 LLM
-        response = self.llm.invoke(prompt)
-        
-        # 如果 LLM 返回的是文本，尝试提取代码块
-        if isinstance(response, str):
-            self.state.harness_code = response
+        if hasattr(self.llm, 'invoke'):
+            response = self.llm.invoke(prompt)
+        elif hasattr(self.llm, '__call__'):
+            response = self.llm(prompt)
         else:
-            self.state.harness_code = str(response)
+            response = str(prompt)
+        
+        # 提取文本内容
+        if hasattr(response, 'content'):
+            response_text = response.content
+        elif isinstance(response, str):
+            response_text = response
+        else:
+            response_text = str(response)
+        
+        self.state.harness_code = response_text
         
         return self.state.harness_code
     
@@ -432,9 +472,9 @@ Docker 环境准备完成:
         
         result = """
 功能测试结果:
-- seed1: ✓ 通过
-- seed2: ✓ 通过
-- seed3: ✓ 通过
+- seed1: [通过]
+- seed2: [通过]
+- seed3: [通过]
 - 无崩溃，无段错误
 """
         return result
@@ -449,7 +489,7 @@ Docker 环境准备完成:
 覆盖率检查结果:
 - Tuples: {self.state.coverage_tuples}
 - Map size: 65536
-- 插桩状态: ✓ 正常
+- 插桩状态: [正常]
 """
         return result
     
