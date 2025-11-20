@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+
+# AFL++ 输出文件
+output/
+*.o
+*.a
+*.so
+fuzz_harness_afl
+harness_afl
+coverage.map
+*.log
+
+# Docker
+.docker/
+
+# 测试文件
+test_output/
+*.crash
+*.hang
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
